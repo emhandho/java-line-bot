@@ -3,12 +3,14 @@ package com.dicoding.linebotjava.demo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.client.LineSignatureValidator;
+import com.linecorp.bot.model.PushMessage;
 import com.linecorp.bot.model.ReplyMessage;
 import com.linecorp.bot.model.event.MessageEvent;
 import com.linecorp.bot.model.event.message.TextMessageContent;
 import com.linecorp.bot.model.message.StickerMessage;
 import com.linecorp.bot.model.message.TextMessage;
 import com.linecorp.bot.model.objectmapper.ModelObjectMapper;
+import com.linecorp.bot.model.profile.UserProfileResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -50,8 +52,6 @@ public class Controller {
                     TextMessageContent textMessageContent = (TextMessageContent) messageEvent.getMessage();
                     replyText(messageEvent.getReplyToken(), textMessageContent.getText());
                 }
-
-                // replyText(replyToken, "Ini pesan balasan." );
             });
 
             return new ResponseEntity<>(HttpStatus.OK);
@@ -59,6 +59,40 @@ public class Controller {
             e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @RequestMapping(value="/pushmessage/{id}/{message}", method=RequestMethod.GET)
+    public ResponseEntity<String> pushmessage(
+            @PathVariable("id") String userId,
+            @PathVariable("message") String textMsg
+    ){
+        TextMessage textMessage = new TextMessage(textMsg);
+        PushMessage pushMessage = new PushMessage(userId, textMessage);
+        push(pushMessage);
+
+        return new ResponseEntity<String>("Push message: " +textMsg+"\nsent to: "+userId, HttpStatus.OK);
+    }
+
+//    @RequestMapping(value="/multicast", method=RequestMethod.GET)
+//    public ResponseEntity<String> multicast(){
+//        String[] userIdList = {};
+//    }
+
+    @RequestMapping(value = "/profile", method = RequestMethod.GET)
+    public ResponseEntity<String> profile(){
+        String userId = "Isi dengan userId Anda";
+        UserProfileResponse profile = getProfile(userId);
+
+        if (profile != null) {
+           String profileName = profile.getDisplayName();
+           TextMessage textMessage = new TextMessage("Hello, " + profileName);
+           PushMessage pushMessage = new PushMessage(userId, textMessage);
+           push(pushMessage);
+
+           return new ResponseEntity<String>("Hello, " + profileName, HttpStatus.OK);
+        }
+
+        return new ResponseEntity<String>(HttpStatus.NOT_FOUND);
     }
 
     private void reply(ReplyMessage replyMessage) {
@@ -81,4 +115,19 @@ public class Controller {
         reply(replyMessage);
     }
 
+    private void push(PushMessage pushMessage){
+        try{
+            lineMessagingClient.pushMessage(pushMessage).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private UserProfileResponse getProfile(String userId) {
+        try {
+            return lineMessagingClient.getProfile(userId).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
